@@ -1,4 +1,10 @@
-"""Flat inference entrypoint for PIXEL."""
+"""
+infer.py
+
+Flat command-line inference entrypoint for PIXEL. This script resolves the
+tokenizer and checkpoint pair, corrects obviously corrupt checkpoint vocab
+metadata when needed, and prints one JSON payload describing the generation.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +14,11 @@ import json
 from pathlib import Path
 
 from configs.registry import get_preset, list_presets
-from core.checkpoint import CheckpointInspection, CheckpointManager
+from core.checkpoint import (
+    CheckpointInspection,
+    CheckpointManager,
+    resolve_inference_vocab_size,
+)
 from core.types import GenerationRequest
 from inference.generator import PixelGenerator
 from tokenizer.manager import ensure_tokenizer, PixelTokenizer
@@ -52,33 +62,33 @@ def _is_hf_model_id(model_str: str) -> bool:
 
 def _download_hf_model(hf_model_id: str) -> tuple[str, str]:
     """Download model checkpoint and tokenizer from HuggingFace Hub.
-    
-    Returns: (checkpoint_path, tokenizer_path)
+
+    Returns:
+        A tuple of `(checkpoint_path, tokenizer_path)`.
     """
     if hf_hub_download is None:
         raise ImportError(
-            f"HuggingFace Hub model ID detected ({hf_model_id}), but huggingface_hub is not installed. "
+            f"HuggingFace Hub model ID detected ({hf_model_id}), "
+            "but huggingface_hub is not installed. "
             "Install it with: pip install huggingface_hub"
         )
-    
-    print(f"📥 Downloading PIXEL model from HuggingFace Hub: {hf_model_id}")
-    
-    # Download checkpoint
+
+    print(f"Downloading PIXEL model from HuggingFace Hub: {hf_model_id}")
+
     checkpoint_path = hf_hub_download(
         repo_id=hf_model_id,
         filename="latest.pt",
         repo_type="model"
     )
-    print(f"  ✓ Checkpoint: {checkpoint_path}")
-    
-    # Download tokenizer
+    print(f"  OK checkpoint: {checkpoint_path}")
+
     tokenizer_path = hf_hub_download(
         repo_id=hf_model_id,
         filename="pixel_tokenizer.model",
         repo_type="model"
     )
-    print(f"  ✓ Tokenizer: {tokenizer_path}")
-    
+    print(f"  OK tokenizer: {tokenizer_path}")
+
     return str(checkpoint_path), str(tokenizer_path)
 
 
@@ -103,71 +113,91 @@ def main() -> None:
     """Run PIXEL inference from the command line."""
     args = build_argparser().parse_args()
     model_config, _ = get_preset(args.size)
-    
-    # Handle HuggingFace Hub model IDs
     checkpoint = args.model
     hf_tokenizer_path = None
     if checkpoint and _is_hf_model_id(checkpoint):
         checkpoint, hf_tokenizer_path = _download_hf_model(checkpoint)
-    
+
     checkpoint = checkpoint or _latest_checkpoint()
     checkpoint_info = _inspect_checkpoint(checkpoint)
     data_path = str(ensure_bootstrap_corpus())
-    
-    # CRITICAL FIX: The checkpoint metadata may be corrupted/incorrect
-    # If model says 16000 vocab but checkpoint says 1262, use 16000
-    if checkpoint_info is not None:
-        required_vocab_size = checkpoint_info.model_config.vocab_size
-        # Sometimes checkpoint metadata is wrong, check if we should override
-        if required_vocab_size < 4000 and model_config.vocab_size > 10000:
-            print(f"⚠️  WARNING: Checkpoint vocab_size ({required_vocab_size}) seems wrong")
-            print(f"            Model config suggests vocab_size={model_config.vocab_size}")
-            print(f"            Using model config vocab_size instead")
-            required_vocab_size = model_config.vocab_size
-    else:
-        required_vocab_size = min(model_config.vocab_size, 4096)
-    
-    print(f"ℹ️  Using vocab_size={required_vocab_size} for tokenizer")
-    
-    # Now check HuggingFace tokenizer vocab
+
+    checkpoint_vocab = (
+        checkpoint_info.model_config.vocab_size if checkpoint_info is not None else None
+    )
+    checkpoint_state_vocab = (
+        checkpoint_info.state_vocab_size if checkpoint_info is not None else None
+    )
+    required_vocab_size = resolve_inference_vocab_size(checkpoint_info, model_config)
+    if checkpoint_vocab is not None and checkpoint_vocab != required_vocab_size:
+        print("WARNING: Checkpoint metadata vocab_size does not match checkpoint weights.")
+        print(f"         Metadata: vocab_size={checkpoint_vocab}")
+        if checkpoint_state_vocab is not None:
+            print(f"         Weights:  vocab_size={checkpoint_state_vocab}")
+        print(f"         Using checkpoint weight vocab_size={required_vocab_size}")
+
+    print(f"Using vocab_size={required_vocab_size} for tokenizer")
+
     if hf_tokenizer_path:
         hf_tokenizer_temp = PixelTokenizer.load(hf_tokenizer_path)
-        print(f"DEBUG: HuggingFace tokenizer has vocab_size={hf_tokenizer_temp.vocab_size}")
-        
+        print(f"HuggingFace tokenizer vocab_size={hf_tokenizer_temp.vocab_size}")
+
         if hf_tokenizer_temp.vocab_size == required_vocab_size:
-            # Perfect match - use HF tokenizer
             tokenizer = hf_tokenizer_temp
-            print(f"✓ Using HuggingFace tokenizer (vocab match: {hf_tokenizer_temp.vocab_size})")
+            print(
+                "Using HuggingFace tokenizer "
+                f"(vocab match: {hf_tokenizer_temp.vocab_size})"
+            )
         else:
-            # CRITICAL MISMATCH - check if local tokenizer exists
             local_tokenizer_path = Path(__file__).parent / "tokenizer" / "pixel_tokenizer.model"
-            if local_tokenizer_path.exists() and Path(__file__).parent.exists():
+            if local_tokenizer_path.exists():
                 try:
                     local_tok = PixelTokenizer.load(str(local_tokenizer_path))
-                    print(f"⚠️  HF tokenizer vocab ({hf_tokenizer_temp.vocab_size}) != checkpoint requires ({required_vocab_size})")
+                    print(
+                        "WARNING: HF tokenizer vocab "
+                        f"({hf_tokenizer_temp.vocab_size}) != "
+                        f"checkpoint requires ({required_vocab_size})"
+                    )
                     if local_tok.vocab_size == required_vocab_size:
-                        print(f"   Local tokenizer matches! Using it: vocab_size={local_tok.vocab_size}")
+                        print(
+                            "   Local tokenizer matches. "
+                            f"Using vocab_size={local_tok.vocab_size}"
+                        )
                         tokenizer = local_tok
                     else:
-                        print(f"   Local tokenizer vocab ({local_tok.vocab_size}) also doesn't match")
-                        print(f"   Generating new tokenizer with vocab_size={required_vocab_size}...")
+                        print(
+                            f"   Local tokenizer vocab ({local_tok.vocab_size}) "
+                            "also doesn't match"
+                        )
+                        print(
+                            "   Generating new tokenizer "
+                            f"with vocab_size={required_vocab_size}..."
+                        )
                         tokenizer = ensure_tokenizer(data_paths=[data_path], vocab_size=required_vocab_size)
-                        print(f"   ✓ Generated tokenizer with vocab_size={tokenizer.vocab_size}")
+                        print(f"   OK generated tokenizer with vocab_size={tokenizer.vocab_size}")
                 except Exception as e:
                     print(f"   Could not load local tokenizer: {e}")
-                    print(f"   Generating new tokenizer with vocab_size={required_vocab_size}...")
+                    print(
+                        "   Generating new tokenizer "
+                        f"with vocab_size={required_vocab_size}..."
+                    )
                     tokenizer = ensure_tokenizer(data_paths=[data_path], vocab_size=required_vocab_size)
-                    print(f"   ✓ Generated tokenizer with vocab_size={tokenizer.vocab_size}")
+                    print(f"   OK generated tokenizer with vocab_size={tokenizer.vocab_size}")
             else:
-                # No local tokenizer, generate one
-                print(f"⚠️  HF tokenizer vocab ({hf_tokenizer_temp.vocab_size}) != checkpoint requires ({required_vocab_size})")
-                print(f"   Generating new tokenizer with vocab_size={required_vocab_size}...")
+                print(
+                    "WARNING: HF tokenizer vocab "
+                    f"({hf_tokenizer_temp.vocab_size}) != "
+                    f"checkpoint requires ({required_vocab_size})"
+                )
+                print(
+                    "   Generating new tokenizer "
+                    f"with vocab_size={required_vocab_size}..."
+                )
                 tokenizer = ensure_tokenizer(data_paths=[data_path], vocab_size=required_vocab_size)
-                print(f"   ✓ Generated tokenizer with vocab_size={tokenizer.vocab_size}")
+                print(f"   OK generated tokenizer with vocab_size={tokenizer.vocab_size}")
     else:
-        # No HF tokenizer, generate local one
         tokenizer = ensure_tokenizer(data_paths=[data_path], vocab_size=required_vocab_size)
-    
+
     if checkpoint_info is None:
         model_config.vocab_size = tokenizer.vocab_size
     generator = PixelGenerator(
@@ -198,4 +228,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+        raise SystemExit(1) from exc

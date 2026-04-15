@@ -1,4 +1,10 @@
-"""Checkpoint save, load, and discovery helpers for PIXEL."""
+"""
+core/checkpoint.py
+
+Checkpoint save, load, inspection, and inference compatibility helpers for
+PIXEL. This module keeps checkpoint metadata handling centralized so CLI and
+web inference resolve the same model configuration from the same checkpoint.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +28,7 @@ class CheckpointInspection:
     model_config: ModelConfig
     training_config: TrainingConfig | None
     metadata: dict[str, Any]
+    state_vocab_size: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize checkpoint details for CLI and web responses."""
@@ -31,7 +38,53 @@ class CheckpointInspection:
             "model": asdict(self.model_config),
             "training": asdict(self.training_config) if self.training_config is not None else None,
             "metadata": self.metadata,
+            "state_vocab_size": self.state_vocab_size,
         }
+
+
+def resolve_inference_vocab_size(
+    checkpoint_info: CheckpointInspection | None,
+    preset_model_config: ModelConfig,
+) -> int:
+    """Resolve the tokenizer vocab size for inference.
+
+    When a checkpoint is available, inference normally trusts the saved model
+    metadata. Some imported Hugging Face checkpoints, however, have been
+    observed to carry obviously corrupt small vocabulary sizes in metadata
+    despite storing full PIXEL embedding tables. In that narrow case, prefer
+    the preset vocabulary so tokenizer generation and model construction stay
+    aligned with the real checkpoint weights.
+
+    Args:
+        checkpoint_info: Inspected checkpoint metadata, if available.
+        preset_model_config: Requested PIXEL preset used as the compatibility
+            baseline when no checkpoint is loaded or when checkpoint metadata
+            is clearly corrupt.
+
+    Returns:
+        The vocabulary size that inference should use for tokenizer and model
+        construction.
+    """
+    if checkpoint_info is None:
+        return min(preset_model_config.vocab_size, 4096)
+    checkpoint_vocab = checkpoint_info.model_config.vocab_size
+    state_vocab = checkpoint_info.state_vocab_size
+    if state_vocab is not None and state_vocab != checkpoint_vocab:
+        checkpoint_info.model_config.vocab_size = state_vocab
+        return state_vocab
+    return checkpoint_vocab
+
+
+def _infer_state_vocab_size(state_dict: dict[str, Any]) -> int | None:
+    """Infer the model vocabulary size from checkpoint tensor shapes."""
+    vocab_sizes: set[int] = set()
+    for key in ("embed_tokens.weight", "model.embed_tokens.weight", "lm_head.weight"):
+        tensor = state_dict.get(key)
+        if isinstance(tensor, torch.Tensor) and tensor.ndim >= 1:
+            vocab_sizes.add(int(tensor.shape[0]))
+    if not vocab_sizes:
+        return None
+    return max(vocab_sizes)
 
 
 class CheckpointManager:
@@ -135,12 +188,19 @@ class CheckpointManager:
             else None
         )
         step = payload.get("step", 0)
+        state_payload = payload.get("model")
+        state_vocab_size = (
+            _infer_state_vocab_size(state_payload)
+            if isinstance(state_payload, dict)
+            else None
+        )
         return CheckpointInspection(
             path=str(target),
             step=int(step) if isinstance(step, int) else 0,
             model_config=model_config,
             training_config=training_config,
             metadata=metadata,
+            state_vocab_size=state_vocab_size,
         )
 
     def load(

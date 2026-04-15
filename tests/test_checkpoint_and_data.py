@@ -1,4 +1,10 @@
-"""Tests for checkpointing and dataset normalization."""
+"""
+tests/test_checkpoint_and_data.py
+
+Regression tests for checkpoint inspection, inference compatibility, and
+dataset normalization. These tests cover checkpoint metadata resolution so
+corrupt vocab fields do not break tokenizer/model alignment during inference.
+"""
 
 from dataclasses import asdict
 from pathlib import Path
@@ -7,7 +13,11 @@ import pytest
 import torch
 
 from configs.registry import get_preset
-from core.checkpoint import CheckpointInspection, CheckpointManager
+from core.checkpoint import (
+    CheckpointInspection,
+    CheckpointManager,
+    resolve_inference_vocab_size,
+)
 from inference.generator import PixelGenerator
 from models.transformer import PixelForCausalLM
 from tokenizer.manager import ensure_tokenizer
@@ -105,6 +115,42 @@ def test_checkpoint_inspection_reads_model_metadata(
     assert inspection.model_config.vocab_size == 256
     assert inspection.training_config is not None
     assert inspection.training_config.size == "100m"
+
+
+def test_resolve_inference_vocab_size_corrects_corrupt_checkpoint_metadata() -> None:
+    """Inference should prefer the checkpoint state vocab when metadata is corrupt."""
+    preset_model_config, _ = get_preset("100m")
+    corrupt_model_config, _ = get_preset("100m")
+    corrupt_model_config.vocab_size = 1262
+    inspection = CheckpointInspection(
+        path="checkpoints/pixel_100m/latest.pt",
+        step=10,
+        model_config=corrupt_model_config,
+        training_config=None,
+        metadata={"model": asdict(corrupt_model_config)},
+        state_vocab_size=16_000,
+    )
+    resolved_vocab_size = resolve_inference_vocab_size(inspection, preset_model_config)
+    assert resolved_vocab_size == 16_000
+    assert inspection.model_config.vocab_size == 16_000
+
+
+def test_resolve_inference_vocab_size_keeps_valid_small_checkpoint_vocab() -> None:
+    """Inference should keep a valid small vocab when checkpoint weights confirm it."""
+    preset_model_config, _ = get_preset("100m")
+    small_model_config, _ = get_preset("100m")
+    small_model_config.vocab_size = 1262
+    inspection = CheckpointInspection(
+        path="checkpoints/pixel_100m/latest.pt",
+        step=10,
+        model_config=small_model_config,
+        training_config=None,
+        metadata={"model": asdict(small_model_config)},
+        state_vocab_size=1262,
+    )
+    resolved_vocab_size = resolve_inference_vocab_size(inspection, preset_model_config)
+    assert resolved_vocab_size == 1262
+    assert inspection.model_config.vocab_size == 1262
 
 
 def test_generator_uses_checkpoint_model_metadata_over_requested_preset(

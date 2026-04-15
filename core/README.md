@@ -11,7 +11,7 @@ This folder is the runtime spine of PIXEL. It centralizes device detection, chec
 ## Key Files
 
 - `runtime.py`: hardware profile detection and health payloads
-- `checkpoint.py`: save/load/latest checkpoint helpers
+- `checkpoint.py`: save/load/latest checkpoint helpers and vocab resolution from checkpoint weights
 - `types.py`: typed request/response dataclasses
 
 ## Related Commands

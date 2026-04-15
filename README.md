@@ -105,7 +105,8 @@ Arguments:
 
 Checkpoint behavior:
 - If a checkpoint is present, PIXEL rebuilds the model from checkpoint metadata.
-- If the checkpoint and tokenizer vocab do not match, inference fails fast with a clear error.
+- If checkpoint metadata disagrees with the checkpoint weight shapes, inference corrects the vocab to match the checkpoint weights before tokenizer/model setup.
+- Real checkpoint/tokenizer vocab mismatches still fail fast with a clear error.
 - Legacy checkpoints without `metadata.model` are rejected instead of guessed.
 
 ### 4. Smoke Test
@@ -191,3 +192,6 @@ GitHub should contain the PIXEL source code and documentation. Hugging Face shou
 7. Inference fails after changing `--size`:
    - `--size` does not override checkpoint architecture anymore.
    - Load the correct checkpoint with `--model`, or remove the incompatible checkpoint.
+8. Hugging Face inference decodes to replacement characters like `�`:
+   - PIXEL now trusts checkpoint weight shapes over checkpoint metadata when those values disagree.
+   - If the issue remains while metadata, weights, and tokenizer all agree, the output is likely model quality rather than a tokenizer mismatch.

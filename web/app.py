@@ -1,4 +1,10 @@
-"""Inference-first FastAPI app for PIXEL."""
+"""
+web/app.py
+
+FastAPI application for browser-based PIXEL inference. This module mirrors the
+CLI inference resolution path so the web UI uses the same checkpoint, tokenizer,
+and vocab compatibility rules as `infer.py`.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +24,11 @@ import uvicorn
 from pydantic import BaseModel, Field
 
 from configs.registry import get_preset, list_presets
-from core.checkpoint import CheckpointInspection, CheckpointManager
+from core.checkpoint import (
+    CheckpointInspection,
+    CheckpointManager,
+    resolve_inference_vocab_size,
+)
 from core.runtime import RuntimeManager
 from core.types import GenerationRequest
 from inference.generator import PixelGenerator
@@ -51,11 +61,15 @@ def _build_generator(size: str, model_path: str | None) -> PixelGenerator:
     checkpoint = model_path or _latest_checkpoint()
     checkpoint_info = _inspect_checkpoint(checkpoint)
     data_path = str(ensure_bootstrap_corpus(PROJECT_ROOT / "data" / "bootstrap" / "demo_corpus.txt"))
-    tokenizer_vocab = (
-        checkpoint_info.model_config.vocab_size
-        if checkpoint_info is not None
-        else min(model_config.vocab_size, 4096)
-    )
+    checkpoint_vocab = checkpoint_info.model_config.vocab_size if checkpoint_info is not None else None
+    tokenizer_vocab = resolve_inference_vocab_size(checkpoint_info, model_config)
+    if checkpoint_vocab is not None and checkpoint_vocab != tokenizer_vocab:
+        LOGGER.warning(
+            "Corrected checkpoint vocab metadata from %s to %s based on checkpoint weights for %s.",
+            checkpoint_vocab,
+            tokenizer_vocab,
+            model_config.name,
+        )
     tokenizer = ensure_tokenizer(
         model_prefix=str(PROJECT_ROOT / "tokenizer" / "pixel_tokenizer"),
         data_paths=[data_path],

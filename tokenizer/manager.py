@@ -93,7 +93,13 @@ def ensure_tokenizer(
     prefix = Path(model_prefix)
     model_path = prefix.with_suffix(".model")
     if model_path.exists():
-        return PixelTokenizer.load(model_path)
+        existing_tokenizer = PixelTokenizer.load(model_path)
+        if existing_tokenizer.vocab_size == vocab_size:
+            return existing_tokenizer
+        else:
+            print(f"Existing tokenizer vocab_size ({existing_tokenizer.vocab_size}) != required ({vocab_size})")
+            print(f" Deleting old tokenizer and retraining with vocab_size={vocab_size}...")
+            model_path.unlink()  # Delete the old tokenizer
     corpus_path = prefix.parent / "bootstrap_corpus.txt"
     write_training_text(corpus_path, data_paths=data_paths)
     train_sentencepiece(corpus_path, prefix, vocab_size=vocab_size)
