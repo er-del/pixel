@@ -115,8 +115,16 @@ def main() -> None:
     data_path = str(ensure_bootstrap_corpus())
     tokenizer_vocab = checkpoint_info.model_config.vocab_size if checkpoint_info is not None else min(model_config.vocab_size, 4096)
     
-    # Use HuggingFace tokenizer if available, otherwise ensure local one
-    if hf_tokenizer_path:
+    # Load tokenizer - vocab size MUST match checkpoint vocab size
+    # CRITICAL: HuggingFace tokenizer may have wrong vocab size (e.g., 1262 vs 16000).
+    # Always generate a tokenizer with the EXACT vocab size from checkpoint.
+    if checkpoint_info and hf_tokenizer_path:
+        hf_tokenizer_temp = PixelTokenizer.load(hf_tokenizer_path)
+        print(f"⚠️  NOTE: HuggingFace tokenizer has vocab_size={hf_tokenizer_temp.vocab_size}, but checkpoint requires={checkpoint_info.model_config.vocab_size}")
+        print(f"       Generating proper tokenizer with vocab_size={tokenizer_vocab}...")
+        tokenizer = ensure_tokenizer(data_paths=[data_path], vocab_size=tokenizer_vocab)
+        print(f"       ✓ Generated tokenizer with vocab_size={tokenizer.vocab_size}")
+    elif hf_tokenizer_path:
         tokenizer = PixelTokenizer.load(hf_tokenizer_path)
         print(f"Using tokenizer from HuggingFace: vocab_size={tokenizer.vocab_size}")
     else:
