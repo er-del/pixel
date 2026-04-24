@@ -1,6 +1,6 @@
 # training
 
-This folder contains PIXEL training data preparation and the optimization loop used by `train.py`.
+This folder contains Balchand AI training data preparation and the optimization loop used by `train.py`.
 
 ## Supported Data Inputs
 
@@ -37,4 +37,4 @@ python train.py --size 3b --use-moe
 
 ## Step-By-Step 1B Guide
 
-For a full `1b` walkthrough, including tokenizer handling and checkpoint safety, read [TRAIN_1B.md](/c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/pixel/training/TRAIN_1B.md).
+For a full `1b` walkthrough, including tokenizer handling and checkpoint safety, read [TRAIN_1B.md](/c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/balchand-ai/training/TRAIN_1B.md).

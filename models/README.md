@@ -1,6 +1,6 @@
 # models
 
-This folder contains the decoder-only transformer used by PIXEL.
+This folder contains the decoder-only transformer used by Balchand AI.
 
 ## What Is Implemented
 

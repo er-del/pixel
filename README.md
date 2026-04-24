@@ -1,13 +1,13 @@
-# PIXEL
+# Balchand AI
 
-PIXEL (Progressive Intelligent eXecution and Efficient Learning) is a local, modular LLM framework built for simple commands and clear defaults. It supports CPU, single-GPU, and multi-GPU usage with the same entrypoints.
+Balchand AI (Progressive Intelligent eXecution and Efficient Learning) is a local, modular LLM framework built for simple commands and clear defaults. It supports CPU, single-GPU, and multi-GPU usage with the same entrypoints.
 
 ## Before You Start
 
-Run all commands from the `pixel/` directory:
+Run all commands from the `balchand-ai/` directory:
 
 ```powershell
-cd "C:\Users\Lenovo\OneDrive\Desktop\Documents\LLM_MOdel\pixel"
+cd "C:\Users\Lenovo\OneDrive\Desktop\Documents\LLM_MOdel\balchand-ai"
 ```
 
 ## Quick Start (Under 5 Commands)
@@ -74,8 +74,8 @@ Arguments:
 - `--use-moe` applies to supported larger presets
 
 1B training guide:
-- Read [TRAIN_1B.md](/c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/pixel/training/TRAIN_1B.md) for the exact step-by-step flow.
-- Keep in mind that PIXEL currently uses one shared tokenizer path, so replacing the tokenizer can break older checkpoints.
+- Read [TRAIN_1B.md](/c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/balchand-ai/training/TRAIN_1B.md) for the exact step-by-step flow.
+- Keep in mind that Balchand AI currently uses one shared tokenizer path, so replacing the tokenizer can break older checkpoints.
 
 ### 3. Inference
 
@@ -93,7 +93,7 @@ python infer.py --size 1b --max-tokens 128
 python infer.py --model checkpoints/pixel_100m/latest.pt --temperature 0 --top-p 1.0
 python infer.py --mode code --prompt "Write a Python function that parses CSV."
 # Model call from hugging face 
-python infer.py --model sage002/pixel --prompt "hi"
+python infer.py --model sage002/balchand-ai --prompt "hi"
 ```
 
 Arguments:
@@ -106,7 +106,7 @@ Arguments:
 - `--mode {chat,completion,summarize,code}`
 
 Checkpoint behavior:
-- If a checkpoint is present, PIXEL rebuilds the model from checkpoint metadata.
+- If a checkpoint is present, Balchand AI rebuilds the model from checkpoint metadata.
 - If checkpoint metadata disagrees with the checkpoint weight shapes, inference corrects the vocab to match the checkpoint weights before tokenizer/model setup.
 - Real checkpoint/tokenizer vocab mismatches still fail fast with a clear error.
 - Legacy checkpoints without `metadata.model` are rejected instead of guessed.
@@ -146,7 +146,7 @@ python hf_push.py
 Upload the bundle to a model repo:
 
 ```bash
-python hf_push.py --repo-id your-name/pixel-100m
+python hf_push.py --repo-id your-name/balchand-ai-100m
 ```
 
 This script exports only Hugging Face model assets:
@@ -155,7 +155,7 @@ This script exports only Hugging Face model assets:
 - generated model card
 - exported config JSON files
 
-GitHub should contain the PIXEL source code and documentation. Hugging Face should contain model artifacts and the model card.
+GitHub should contain the Balchand AI source code and documentation. Hugging Face should contain model artifacts and the model card.
 
 ## Project Structure
 
@@ -190,10 +190,10 @@ GitHub should contain the PIXEL source code and documentation. Hugging Face shou
    - Re-check `--legacy-root` and include explicit copy flags.
 6. Web/API generation fails with tokenizer decode errors:
    - Run `python setup.py` to ensure `sentencepiece` is installed.
-   - If you must run without `sentencepiece`, PIXEL now falls back to a byte tokenizer automatically.
+   - If you must run without `sentencepiece`, Balchand AI now falls back to a byte tokenizer automatically.
 7. Inference fails after changing `--size`:
    - `--size` does not override checkpoint architecture anymore.
    - Load the correct checkpoint with `--model`, or remove the incompatible checkpoint.
 8. Hugging Face inference decodes to replacement characters like `�`:
-   - PIXEL now trusts checkpoint weight shapes over checkpoint metadata when those values disagree.
+   - Balchand AI now trusts checkpoint weight shapes over checkpoint metadata when those values disagree.
    - If the issue remains while metadata, weights, and tokenizer all agree, the output is likely model quality rather than a tokenizer mismatch.

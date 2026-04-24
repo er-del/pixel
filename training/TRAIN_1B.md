@@ -1,20 +1,20 @@
-# Train A 1B PIXEL Model
+# Train A 1B Balchand AI Model
 
-This guide explains how to create a new `1b` PIXEL model using the code that exists in this repository today.
+This guide explains how to create a new `1b` Balchand AI model using the code that exists in this repository today.
 
 The `1b` preset is a 1B-class architecture. Its current approximate parameter count is about `1.198B`.
 
 ## Before You Start
 
-Run all commands from the `pixel/` folder:
+Run all commands from the `balchand-ai/` folder:
 
 ```powershell
-cd "C:\Users\Lenovo\OneDrive\Desktop\Documents\LLM_MOdel\pixel"
+cd "C:\Users\Lenovo\OneDrive\Desktop\Documents\LLM_MOdel\balchand-ai"
 ```
 
 Important current limitation:
 
-- PIXEL currently uses one shared tokenizer path: `tokenizer/pixel_tokenizer`
+- Balchand AI currently uses one shared tokenizer path: `tokenizer/pixel_tokenizer`
 - If you replace that tokenizer, older checkpoints that were trained with the previous tokenizer can stop working
 - Your current working `pixel_100m` checkpoint expects a tokenizer vocab of `1262`
 
@@ -36,7 +36,7 @@ The second command must print a version number. If it fails, stop and fix the en
 
 ## Step 2. Prepare Training Data
 
-PIXEL supports:
+Balchand AI supports:
 
 - `.txt`
 - `.jsonl` with a `text` field

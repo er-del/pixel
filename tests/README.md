@@ -1,6 +1,6 @@
 # tests
 
-This folder contains targeted tests for the PIXEL rewrite.
+This folder contains targeted tests for the Balchand AI rewrite.
 
 ## Run Tests
 

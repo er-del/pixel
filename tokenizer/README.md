@@ -1,6 +1,6 @@
 # tokenizer
 
-This folder manages tokenization in PIXEL. It trains and loads tokenizers, validates round-trip behavior, and provides a fallback tokenizer when `sentencepiece` is unavailable.
+This folder manages tokenization in Balchand AI. It trains and loads tokenizers, validates round-trip behavior, and provides a fallback tokenizer when `sentencepiece` is unavailable.
 
 ## When You Use This Folder
 
@@ -25,7 +25,7 @@ This folder manages tokenization in PIXEL. It trains and loads tokenizers, valid
 python -m tokenizer.manager --output-prefix tokenizer/pixel_tokenizer --vocab-size 2048
 ```
 
-Direct script execution also works from the `pixel/` folder:
+Direct script execution also works from the `balchand-ai/` folder:
 
 ```bash
 python tokenizer/manager.py --output-prefix tokenizer/pixel_tokenizer --vocab-size 2048

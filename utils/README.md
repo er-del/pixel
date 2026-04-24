@@ -1,6 +1,6 @@
 # utils
 
-This folder contains shared helper functions used across multiple PIXEL modules.
+This folder contains shared helper functions used across multiple Balchand AI modules.
 
 ## Key Files
 
