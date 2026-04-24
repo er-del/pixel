@@ -7,7 +7,7 @@ Balchand AI (Progressive Intelligent eXecution and Efficient Learning) is a loca
 Run all commands from the `balchand-ai/` directory:
 
 ```powershell
-cd "C:\Users\Lenovo\OneDrive\Desktop\Documents\LLM_MOdel\balchand-ai"
+cd %USERPROFILE%\balchand-ai
 ```
 
 ## Quick Start (Under 5 Commands)
